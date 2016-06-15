@@ -5,17 +5,10 @@ import (
 )
 
 const (
-	DEFAULT_PREFIX    = "/home/r"
-	WORKDIR           = "/var/rogi"
-	DATAFILE          = WORKDIR + "/rogi.sqlite"
-	LOCKFILE          = WORKDIR + "/rogi.lock"
-	LIST_ALL_SETTINGS = `SELECT * FROM sets`
-	LIST_SETTINGS     = `SELECT * FROM sets WHERE pkg=?`
-	LIST_SETTING      = `SELECT * FROM sets WHERE pkg=? AND key=?`
-	COUNT_SETTING     = "SELECT COUNT(1) AS cc FROM sets WHERE pkg = ? AND key = ?"
-	INSERT_SETTING    = "INSERT INTO sets (value, pkg, key) VALUES (?, ?, ?)"
-	CHANGE_SETTING    = "UPDATE sets SET value = ? WHERE pkg = ? AND key = ?"
-	SETS_TABLE        = `CREATE TABLE sets (pkg TEXT, key TEXT, value BLOB)`
+	DEFAULT_PREFIX = "/home/r"
+	WORKDIR        = "/var/rogi"
+	DATAFILE       = WORKDIR + "/rogi.db"
+	SETTING_BUCKET = "setting"
 )
 
 var (
@@ -87,5 +80,7 @@ type SettingObject struct {
 	Key     string      `db:"key"`
 	Value   interface{} `db:"value"`
 }
+
+type settings map[string]string
 
 type SettingObjects []SettingObject

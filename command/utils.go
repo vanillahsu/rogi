@@ -13,7 +13,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/jmoiron/sqlx"
+	"github.com/boltdb/bolt"
 )
 
 // Debug shows debug messages in functions like Run.
@@ -27,39 +27,26 @@ var (
 
 func InitEnv() {
 	if err := syscall.Access(DEFAULT_PREFIX, 0755); err != nil {
-		syscall.Mkdir(DEFAULT_PREFIX, 0755)
-	}
-
-	datafile := DEFAULT_PREFIX + DATAFILE
-
-	if err := syscall.Access(datafile, 0644); err != nil {
-		db := initDb()
-		defer db.Close()
-
-		db.Exec(SETS_TABLE)
-		//db.Exec(STARTS_TABLE)
-	} else {
-		log.Fatalf("Fail to create database file (%s)\n", err)
+		os.Mkdir(DEFAULT_PREFIX, 0755)
+		os.Mkdir(DEFAULT_PREFIX+"/bin", 0755)
+		os.Mkdir(DEFAULT_PREFIX+"/include", 0755)
+		os.Mkdir(DEFAULT_PREFIX+"/lib", 0755)
+		os.Mkdir(DEFAULT_PREFIX+"/libdata", 0755)
+		os.Mkdir(DEFAULT_PREFIX+"/libexec", 0755)
+		os.Mkdir(DEFAULT_PREFIX+"/sbin", 0755)
+		os.Mkdir(DEFAULT_PREFIX+"/share", 0755)
+		os.Mkdir(DEFAULT_PREFIX+"/var", 0755)
 	}
 }
 
-func initDb() *sqlx.DB {
+func initDb() *bolt.DB {
 	datafile := DEFAULT_PREFIX + DATAFILE
-	engine, err := sqlx.Connect("sqlite3", datafile)
+	db, err := bolt.Open(datafile, 0600, nil)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
-	return engine
-}
-
-func Unlock() {
-	lockfile := DEFAULT_PREFIX + LOCKFILE
-
-	if err := syscall.Access(lockfile, 0644); err == nil {
-		os.Remove(lockfile)
-		fmt.Printf("unlock: %s\n", lockfile)
-	}
+	return db
 }
 
 func splitWithSpaceAndQuote(arg string) (s []string) {

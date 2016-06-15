@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/mitchellh/cli"
+	"github.com/vanillahsu/rogi/command"
 )
 
 func main() {
@@ -27,6 +28,8 @@ func realMain() int {
 			break
 		}
 	}
+
+	command.InitEnv()
 
 	cli := &cli.CLI{
 		Args:     args,

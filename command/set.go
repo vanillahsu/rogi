@@ -1,17 +1,18 @@
 package command
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
 
-	"github.com/jmoiron/sqlx"
-	_ "github.com/mattn/go-sqlite3"
+	"github.com/BurntSushi/toml"
+	"github.com/boltdb/bolt"
 	"github.com/mitchellh/cli"
 )
 
 type SetCommand struct {
-	Ui cli.Ui
+	UI cli.Ui
 }
 
 func (c *SetCommand) Help() string {
@@ -50,48 +51,114 @@ func (c *SetCommand) Synopsis() string {
 	return "set"
 }
 
-func listSettings(db *sqlx.DB, w io.Writer, args ...string) {
-	var rows *sqlx.Rows
-	var query string
-	var err error
+func listAllSettings(db *bolt.DB, w io.Writer) error {
+	return db.View(func(tx *bolt.Tx) error {
+		b, err := tx.CreateBucketIfNotExists([]byte(SETTING_BUCKET))
+		if err != nil {
+			return fmt.Errorf("craete bucket: %s", err)
+		}
 
-	fmt.Printf("args: %v\n", args)
-	switch len(args) {
-	case 2:
-		query = LIST_SETTING
-	case 1:
-		query = LIST_SETTINGS
-	case 0:
-		query = LIST_ALL_SETTINGS
-	}
+		c := b.Cursor()
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			var x settings
 
-	rows, err = db.Queryx(query, args[0], args[1])
-	if err != nil {
-		panic(err)
-	}
-	defer rows.Close()
+			if _, err := toml.Decode(string(v), &x); err != nil {
+				return fmt.Errorf("toml.Decode: %s", err)
+			}
 
-	fmt.Printf("%s\n", query)
-	for rows.Next() {
-		var so SettingObject
-		rows.StructScan(so)
-		fmt.Fprintf(w, "%s.%s=%s\n", so.Package, so.Key, so.Value)
+			for y, z := range x {
+				fmt.Fprintf(w, "%s.%s=%s\n", string(k), y, z)
+			}
+		}
+
+		return nil
+	})
+}
+
+func listPkgSettings(db *bolt.DB, w io.Writer, pkg string) error {
+	return db.View(func(tx *bolt.Tx) error {
+		b, err := tx.CreateBucketIfNotExists([]byte(SETTING_BUCKET))
+		if err != nil {
+			return fmt.Errorf("craete bucket: %s", err)
+		}
+
+		c := b.Get([]byte(pkg))
+		var x settings
+
+		if _, err := toml.Decode(string(c), &x); err != nil {
+			return fmt.Errorf("toml.Decode: %s", err)
+		}
+
+		for y, z := range x {
+			fmt.Fprintf(w, "%s.%s=%s\n", pkg, y, z)
+		}
+
+		return nil
+	})
+}
+
+func listOneSetting(db *bolt.DB, w io.Writer, pkg, key string) error {
+	return db.View(func(tx *bolt.Tx) error {
+		b, err := tx.CreateBucketIfNotExists([]byte(SETTING_BUCKET))
+		if err != nil {
+			return fmt.Errorf("craete bucket: %s", err)
+		}
+
+		c := b.Get([]byte(pkg))
+		var x settings
+
+		if _, err := toml.Decode(string(c), &x); err != nil {
+			return fmt.Errorf("toml.Decode: %s", err)
+		}
+
+		if _, ok := x[key]; ok {
+			fmt.Fprintf(w, "%s.%s=%s\n", pkg, key, x[key])
+		} else {
+			fmt.Fprintf(w, "Could not found %s.%s", pkg, key)
+		}
+
+		return nil
+	})
+}
+
+func listSettings(db *bolt.DB, w io.Writer, args ...string) {
+	if len(args) > 0 {
+		if args[0] != "" && args[1] != "" {
+			listOneSetting(db, w, args[0], args[1])
+		} else if args[0] != "" && args[1] == "" {
+			listPkgSettings(db, w, args[0])
+		}
+	} else {
+		listAllSettings(db, w)
 	}
 }
 
-func changeSetting(db *sqlx.DB, pkg, key, value string) {
-	var cc int32
-	var query string
+func changeSetting(db *bolt.DB, pkg, key, value string) error {
+	return db.Update(func(tx *bolt.Tx) error {
+		b, err := tx.CreateBucketIfNotExists([]byte(SETTING_BUCKET))
+		if err != nil {
+			return fmt.Errorf("create bucket (%s)", err)
+		}
 
-	row := db.QueryRow(COUNT_SETTING, pkg, key)
-	row.Scan(&cc)
-	if cc == 1 {
-		query = CHANGE_SETTING
-	} else {
-		query = INSERT_SETTING
-	}
-	_, err := db.Exec(query, value, pkg, key)
-	if err != nil {
-		panic(err)
-	}
+		c := b.Get([]byte(pkg))
+
+		var x settings
+		if _, err := toml.Decode(string(c), &x); err != nil {
+			return fmt.Errorf("toml.Decode: %s", err)
+		}
+
+		x[key] = value
+
+		var buffer bytes.Buffer
+		e := toml.NewEncoder(&buffer)
+		err = e.Encode(x)
+
+		if err != nil {
+			return fmt.Errorf("toml.Encode: %s", err)
+		}
+
+		b.Put([]byte(pkg), buffer.Bytes())
+
+		return nil
+	})
 }

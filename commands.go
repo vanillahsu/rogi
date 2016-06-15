@@ -16,13 +16,13 @@ func init() {
 	Commands = map[string]cli.CommandFactory{
 		"env": func() (cli.Command, error) {
 			return &command.EnvCommand{
-				Ui: ui,
+				UI: ui,
 			}, nil
 		},
 
 		"set": func() (cli.Command, error) {
 			return &command.SetCommand{
-				Ui: ui,
+				UI: ui,
 			}, nil
 		},
 

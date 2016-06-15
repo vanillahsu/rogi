@@ -12,12 +12,13 @@ import (
 	"os"
 	"strings"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/BurntSushi/toml"
+	"github.com/boltdb/bolt"
 	"github.com/mitchellh/cli"
 )
 
 type EnvCommand struct {
-	Ui cli.Ui
+	UI cli.Ui
 }
 
 func init() {
@@ -33,42 +34,45 @@ Usage: rogi env pkg [filename]
 	return strings.TrimSpace(helpText)
 }
 
+// Run will return integer as true or false.
 func (c *EnvCommand) Run(args []string) int {
 	length := len(args)
 	db := initDb()
 	defer db.Close()
 
-	rows, err := db.Queryx(LIST_ALL_SETTINGS)
-	if err != nil {
-		panic(err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var so SettingObject
-		err := rows.StructScan(&so)
-
+	db.View(func(tx *bolt.Tx) error {
+		b, err := tx.CreateBucketIfNotExists([]byte(SETTING_BUCKET))
 		if err != nil {
-			continue
+			return fmt.Errorf("create bucket: %s", err)
 		}
 
-		env := fmt.Sprintf("_%s__%s_=%s", strings.ToUpper(so.Package), strings.ToUpper(so.Key), so.Value)
-		_ENV = append(_ENV, env)
-		if length > 0 && args[0] == so.Package {
-			env = fmt.Sprintf("_%s_=%s", strings.ToUpper(so.Key), so.Value)
-			_ENV = append(_ENV, env)
+		cur := b.Cursor()
+
+		for k, v := cur.First(); k != nil; k, v = cur.Next() {
+			var x settings
+			if _, err := toml.Decode(string(v), &x); err != nil {
+				continue
+			}
+
+			for y, z := range x {
+				env := fmt.Sprintf("_%s__%s=%s", strings.ToUpper(string(k)), strings.ToUpper(y), strings.ToUpper(z))
+				_ENV = append(_ENV, env)
+			}
 		}
-	}
+
+		return nil
+	})
 
 	switch length {
 	case 2:
 		out, err := Run(args[1])
 		if err != nil {
-			log.Fatalf("Could not run (%s) error (%v)", args[1], err)
+			msg := fmt.Sprintf("Could not run (%s) error (%v)", args[1], err)
+			c.UI.Warn(msg)
 		}
 		fmt.Printf("out: %s\n", out)
 	default:
-		for i, _ := range _ENV {
+		for i := range _ENV {
 			fmt.Fprintf(os.Stdout, "%s\n", _ENV[i])
 		}
 	}
