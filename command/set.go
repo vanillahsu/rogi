@@ -53,12 +53,14 @@ func (c *SetCommand) Synopsis() string {
 
 func listAllSettings(db *bolt.DB, w io.Writer) error {
 	return db.View(func(tx *bolt.Tx) error {
-		b, err := tx.CreateBucketIfNotExists([]byte(SETTING_BUCKET))
-		if err != nil {
-			return fmt.Errorf("craete bucket: %s", err)
+		b := tx.Bucket([]byte(SETTING_BUCKET))
+
+		if b == nil {
+			return fmt.Errorf("bucket %s not exist", SETTING_BUCKET)
 		}
 
 		c := b.Cursor()
+
 		for k, v := c.First(); k != nil; k, v = c.Next() {
 			var x settings
 
@@ -77,13 +79,15 @@ func listAllSettings(db *bolt.DB, w io.Writer) error {
 
 func listPkgSettings(db *bolt.DB, w io.Writer, pkg string) error {
 	return db.View(func(tx *bolt.Tx) error {
-		b, err := tx.CreateBucketIfNotExists([]byte(SETTING_BUCKET))
-		if err != nil {
-			return fmt.Errorf("craete bucket: %s", err)
+		var x settings
+
+		b := tx.Bucket([]byte(SETTING_BUCKET))
+
+		if b == nil {
+			return fmt.Errorf("bucket %s not exist", SETTING_BUCKET)
 		}
 
 		c := b.Get([]byte(pkg))
-		var x settings
 
 		if _, err := toml.Decode(string(c), &x); err != nil {
 			return fmt.Errorf("toml.Decode: %s", err)
@@ -99,13 +103,15 @@ func listPkgSettings(db *bolt.DB, w io.Writer, pkg string) error {
 
 func listOneSetting(db *bolt.DB, w io.Writer, pkg, key string) error {
 	return db.View(func(tx *bolt.Tx) error {
-		b, err := tx.CreateBucketIfNotExists([]byte(SETTING_BUCKET))
-		if err != nil {
-			return fmt.Errorf("craete bucket: %s", err)
+		var x settings
+
+		b := tx.Bucket([]byte(SETTING_BUCKET))
+
+		if b == nil {
+			return fmt.Errorf("bucket %s not exist", SETTING_BUCKET)
 		}
 
 		c := b.Get([]byte(pkg))
-		var x settings
 
 		if _, err := toml.Decode(string(c), &x); err != nil {
 			return fmt.Errorf("toml.Decode: %s", err)
@@ -157,8 +163,8 @@ func changeSetting(db *bolt.DB, pkg, key, value string) error {
 			return fmt.Errorf("toml.Encode: %s", err)
 		}
 
-		b.Put([]byte(pkg), buffer.Bytes())
+		err = b.Put([]byte(pkg), buffer.Bytes())
 
-		return nil
+		return err
 	})
 }

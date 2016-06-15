@@ -36,6 +36,7 @@ func InitEnv() {
 		os.Mkdir(DEFAULT_PREFIX+"/sbin", 0755)
 		os.Mkdir(DEFAULT_PREFIX+"/share", 0755)
 		os.Mkdir(DEFAULT_PREFIX+"/var", 0755)
+		os.Mkdir(DEFAULT_PREFIX+"/var/rogi", 0755)
 	}
 }
 
