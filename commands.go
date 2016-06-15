@@ -14,6 +14,18 @@ func init() {
 	ui := &cli.BasicUi{Writer: os.Stdout}
 
 	Commands = map[string]cli.CommandFactory{
+		"activate": func() (cli.Command, error) {
+			return &command.ActivateCommand{
+				UI: ui,
+			}, nil
+		},
+
+		"clean": func() (cli.Command, error) {
+			return &command.CleanCommand{
+				UI: ui,
+			}, nil
+		},
+
 		"env": func() (cli.Command, error) {
 			return &command.EnvCommand{
 				UI: ui,
@@ -22,6 +34,12 @@ func init() {
 
 		"set": func() (cli.Command, error) {
 			return &command.SetCommand{
+				UI: ui,
+			}, nil
+		},
+
+		"unset": func() (cli.Command, error) {
+			return &command.UnsetCommand{
 				UI: ui,
 			}, nil
 		},
